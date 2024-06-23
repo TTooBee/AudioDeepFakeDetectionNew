@@ -8,6 +8,8 @@ import numpy as np
 from sklearn.metrics import f1_score, roc_auc_score, roc_curve
 from scipy.optimize import brentq
 from scipy.interpolate import interp1d
+import os
+from datetime import datetime
 
 from Dataset import AudioFeaturesDataset
 
@@ -19,7 +21,59 @@ def parse_feature_indices(index_str, max_dim):
     else:
         return list(map(int, index_str.split()))
 
-def train_and_validate(model, device, train_loader, val_loader, optimizer, criterion, epochs, save_path):
+def save_training_results(args, results, folder):
+    result_file = os.path.join(folder, 'result.txt')
+    
+    with open(result_file, 'w') as f:
+        f.write("Training Arguments:\n")
+        for arg in vars(args):
+            f.write(f"--{arg} : {getattr(args, arg)}\n")
+        f.write("\nTraining Results:\n")
+        for result in results:
+            f.write(result + "\n")
+    print(f"Training results saved to {result_file}")
+    
+def save_training_plot(train_losses, val_losses, train_accuracies, val_accuracies, val_eers, val_f1s, val_aucs, folder):
+    plot_file = os.path.join(folder, 'result.png')
+
+    plt.figure(figsize=(20, 5))
+
+    plt.subplot(1, 4, 1)
+    plt.plot(train_losses, label='Train Loss')
+    plt.plot(val_losses, label='Validation Loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.title('Loss')
+    plt.legend()
+
+    plt.subplot(1, 4, 2)
+    plt.plot(train_accuracies, label='Train Accuracy')
+    plt.plot(val_accuracies, label='Validation Accuracy')
+    plt.xlabel('Epochs')
+    plt.ylabel('Accuracy')
+    plt.title('Accuracy')
+    plt.legend()
+
+    plt.subplot(1, 4, 3)
+    plt.plot(val_eers, label='Validation EER')
+    plt.xlabel('Epochs')
+    plt.ylabel='EER'
+    plt.title('EER')
+    plt.legend()
+
+    plt.subplot(1, 4, 4)
+    plt.plot(val_f1s, label='Validation F1')
+    plt.plot(val_aucs, label='Validation AUC')
+    plt.xlabel('Epochs')
+    plt.ylabel='Score'
+    plt.title('F1 and AUC')
+    plt.legend()
+
+    plt.tight_layout()
+    plt.savefig(plot_file)
+    print(f"Training plot saved to {plot_file}")
+
+def train_and_validate(model, device, train_loader, val_loader, optimizer, criterion, epochs, save_path, args):
     best_val_loss = float('inf')
     train_losses = []
     val_losses = []
@@ -28,6 +82,14 @@ def train_and_validate(model, device, train_loader, val_loader, optimizer, crite
     val_eers = []
     val_f1s = []
     val_aucs = []
+    training_results = []
+
+    timestamp = datetime.now().strftime('%Y_%m_%d_%H%M')
+    result_folder = os.path.join('training_result', timestamp)
+    os.makedirs(result_folder, exist_ok=True)
+
+    if not save_path:
+        save_path = os.path.join(result_folder, 'model_weights.pt')
 
     for epoch in range(epochs):
         model.train()
@@ -53,6 +115,7 @@ def train_and_validate(model, device, train_loader, val_loader, optimizer, crite
         train_losses.append(avg_train_loss)
         train_accuracies.append(train_accuracy)
         print(f'Epoch [{epoch+1}/{epochs}], Train Loss: {avg_train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}')
+        training_results.append(f'Epoch [{epoch+1}/{epochs}], Train Loss: {avg_train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}')
 
         model.eval()
         total_val_loss = 0
@@ -96,47 +159,15 @@ def train_and_validate(model, device, train_loader, val_loader, optimizer, crite
         val_aucs.append(val_auc)
 
         print(f'Epoch [{epoch+1}/{epochs}], Validation Loss: {avg_val_loss:.4f}, Validation Accuracy: {val_accuracy:.4f}, EER: {eer:.4f}, F1: {val_f1:.4f}, AUC: {val_auc:.4f}')
+        training_results.append(f'Epoch [{epoch+1}/{epochs}], Validation Loss: {avg_val_loss:.4f}, Validation Accuracy: {val_accuracy:.4f}, EER: {eer:.4f}, F1: {val_f1:.4f}, AUC: {val_auc:.4f}')
 
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
             torch.save(model.state_dict(), save_path)
             print(f'Model saved to {save_path} with Validation Loss: {best_val_loss:.4f}')
 
-    plt.figure(figsize=(20, 5))
-
-    plt.subplot(1, 4, 1)
-    plt.plot(train_losses, label='Train Loss')
-    plt.plot(val_losses, label='Validation Loss')
-    plt.xlabel('Epochs')
-    plt.ylabel('Loss')
-    plt.title('Loss')
-    plt.legend()
-
-    plt.subplot(1, 4, 2)
-    plt.plot(train_accuracies, label='Train Accuracy')
-    plt.plot(val_accuracies, label='Validation Accuracy')
-    plt.xlabel('Epochs')
-    plt.ylabel('Accuracy')
-    plt.title('Accuracy')
-    plt.legend()
-
-    plt.subplot(1, 4, 3)
-    plt.plot(val_eers, label='Validation EER')
-    plt.xlabel('Epochs')
-    plt.ylabel='EER'
-    plt.title('EER')
-    plt.legend()
-
-    plt.subplot(1, 4, 4)
-    plt.plot(val_f1s, label='Validation F1')
-    plt.plot(val_aucs, label='Validation AUC')
-    plt.xlabel('Epochs')
-    plt.ylabel='Score'
-    plt.title('F1 and AUC')
-    plt.legend()
-
-    plt.tight_layout()
-    plt.show()
+    save_training_results(args, training_results, result_folder)
+    save_training_plot(train_losses, val_losses, train_accuracies, val_accuracies, val_eers, val_f1s, val_aucs, result_folder)
 
 def main(args):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -189,7 +220,7 @@ def main(args):
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
     criterion = nn.BCEWithLogitsLoss()
     
-    train_and_validate(model, device, train_loader, val_loader, optimizer, criterion, args.epochs, args.save_path)
+    train_and_validate(model, device, train_loader, val_loader, optimizer, criterion, args.epochs, args.save_path, args)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Train a model.")
@@ -198,7 +229,7 @@ if __name__ == '__main__':
     parser.add_argument('--fake', type=str, required=True, help='Directory containing fake audio features.')
     parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument('--epochs', type=int, default=20)
-    parser.add_argument('--save_path', type=str, default='model_weights.pt')
+    parser.add_argument('--save_path', type=str, default='', help='Path to save the model file.')
     parser.add_argument('--model', type=str, choices=['lstm', 'specrnet', 'cnn'], required=True, help='Model type to use.')
     parser.add_argument('--learning_rate', type=float, default=0.0000001, help='Learning rate for training the model.')
     parser.add_argument('--mfcc_feature_idx', type=str, default='all', help='Indices of mfcc features to use, space-separated or "all".')
