@@ -14,7 +14,7 @@ def load_and_pad_matrix(feature_path, target_length=324, feature_dim=40):
         padding = np.zeros((target_length - matrix.shape[0], feature_dim))
         matrix = np.vstack((matrix, padding))
     
-    return matrix.T  # (feature_dim, target_length)
+    return matrix.T
 
 def compute_delta(features):
     delta = np.zeros_like(features)
@@ -24,25 +24,36 @@ def compute_delta(features):
     delta[:, -1] = features[:, -1] - features[:, -2]
     return delta
 
-def load_features(base_folder, feature_dim):
+def load_features(base_folder, original_feature_dim, selected_indices):
     all_features = []
-    feature_folder = os.path.join(base_folder, f'features_{feature_dim}')
+    feature_folder = os.path.join(base_folder, f'features_{original_feature_dim}')
     
     if not os.path.isdir(feature_folder):
+        # 디버깅용 출력: 폴더가 존재하지 않는 경우
+        print(f"DEBUG: Feature folder {feature_folder} does not exist")
         return np.array(all_features)
 
     files = [f for f in os.listdir(feature_folder) if f.endswith('.txt')]
     
     for file_name in tqdm(files, desc="Processing files", unit="file"):
         feature_path = os.path.join(feature_folder, file_name)
-        matrix = load_and_pad_matrix(feature_path, feature_dim=feature_dim)
+        try:
+            matrix = load_and_pad_matrix(feature_path, feature_dim=original_feature_dim)
+        except Exception as e:
+            # 디버깅용 출력: 파일 로드 실패 시 예외 메시지
+            print(f"DEBUG: Failed to load file {feature_path}: {e}")
+            continue
+        
         delta = compute_delta(matrix)
         delta_delta = compute_delta(delta)
-        combined = np.concatenate((matrix, delta, delta_delta), axis=1)  # (feature_dim, target_length*3)
-        all_features.append(combined)
+        combined = np.concatenate((matrix, delta, delta_delta), axis=1)
+
+        selected_evs = combined[selected_indices, :]
+        all_features.append(selected_evs)
+
     return np.array(all_features)
 
-def extract_mfcc(base_folder, feature_dim, sample_rate=16000, n_fft=400, hop_length=160, win_length=400, evs_folder=None, evs_indices=None):
+def extract_mfcc(base_folder, original_feature_dim, selected_indices, sample_rate=16000, n_fft=400, hop_length=160, win_length=400):
     all_features = []
     wav_folder = os.path.join(base_folder, 'wav')
     
@@ -51,14 +62,14 @@ def extract_mfcc(base_folder, feature_dim, sample_rate=16000, n_fft=400, hop_len
 
     files = [f for f in os.listdir(wav_folder) if f.endswith(('.flac', '.wav'))]
     
-    n_mels = feature_dim * 3  # n_mels를 feature_dim의 3배로 설정
+    n_mels = original_feature_dim * 3
     
     mfcc_transform = transforms.MFCC(
         sample_rate=sample_rate,
-        n_mfcc=feature_dim,  # 추출할 MFCC 계수의 개수
+        n_mfcc=original_feature_dim,
         melkwargs={
             'n_fft': n_fft,
-            'n_mels': n_mels,  # 멜 필터의 개수
+            'n_mels': n_mels,
             'hop_length': hop_length,
             'win_length': win_length
         }
@@ -68,35 +79,34 @@ def extract_mfcc(base_folder, feature_dim, sample_rate=16000, n_fft=400, hop_len
         wav_path = os.path.join(wav_folder, file_name)
         waveform, sr = torchaudio.load(wav_path)
         
-        # Sample rate 변경
         if sr != sample_rate:
             waveform = torchaudio.transforms.Resample(orig_freq=sr, new_freq=sample_rate)(waveform)
         
         mfcc = mfcc_transform(waveform)
-        mfcc = mfcc.squeeze(0).numpy()  # (feature_dim, time_length)
+        mfcc = mfcc.squeeze(0).numpy()
         
-        # Padding or trimming to ensure consistent shape
         if mfcc.shape[1] > 324:
             mfcc = mfcc[:, :324]
         elif mfcc.shape[1] < 324:
-            padding = np.zeros((feature_dim, 324 - mfcc.shape[1]))
+            padding = np.zeros((original_feature_dim, 324 - mfcc.shape[1]))
             mfcc = np.hstack((mfcc, padding))
         
         delta = compute_delta(mfcc)
         delta_delta = compute_delta(delta)
-        combined = np.concatenate((mfcc, delta, delta_delta), axis=1)  # (feature_dim, 324*3)
+        combined = np.concatenate((mfcc, delta, delta_delta), axis=1)
 
-        # EVS feature 추가
-        if evs_folder and evs_indices:
-            evs_path = os.path.join(evs_folder, file_name.replace('.wav', '.txt'))
-            if os.path.exists(evs_path):
-                evs_matrix = load_and_pad_matrix(evs_path, target_length=324, feature_dim=feature_dim)
-                evs_indices = list(map(int, evs_indices.split()))  # 인덱스 리스트로 변환
-                selected_evs = evs_matrix[evs_indices, :]
-                combined = np.concatenate((combined, selected_evs), axis=0)
+        selected_mfcc = combined[selected_indices, :]
 
-        all_features.append(combined)
+        all_features.append(selected_mfcc)
     return np.array(all_features)
+
+def parse_feature_indices(index_str, max_dim):
+    if index_str == 'all':
+        return list(range(max_dim))
+    elif index_str == 'none':
+        return []
+    else:
+        return list(map(int, index_str.split()))
 
 if __name__ == "__main__":
     import argparse
@@ -105,20 +115,23 @@ if __name__ == "__main__":
     parser.add_argument('--real', type=str, required=True, help='Directory containing real audio features.')
     parser.add_argument('--fake', type=str, required=True, help='Directory containing fake audio features.')
     parser.add_argument('--feature_dim', type=int, required=True, help='Number of features to use.')
-    parser.add_argument('--feature', type=str, choices=['mfcc', 'evs'], required=True, help='Feature type to use.')
-    parser.add_argument('--feature_mix', type=bool, default=False, help='Whether to mix mfcc with evs features.')
-    parser.add_argument('--evs_feature_idx', type=str, help='Indices of evs features to add, space-separated.')
+    parser.add_argument('--mfcc_feature_idx', type=str, default='all', help='Indices of mfcc features to use, space-separated or "all".')
+    parser.add_argument('--evs_feature_idx', type=str, default='none', help='Indices of evs features to use, space-separated or "none".')
     args = parser.parse_args()
 
-    if args.feature == 'evs':
-        features_real = load_features(args.real, args.feature_dim)
-        print(features_real.shape)  # 출력 결과는 (파일 수, feature_dim, 324*3) 형태가 됩니다.
+    mfcc_indices = parse_feature_indices(args.mfcc_feature_idx, args.feature_dim)
+    evs_indices = parse_feature_indices(args.evs_feature_idx, args.feature_dim)
 
-        features_fake = load_features(args.fake, args.feature_dim)
-        print(features_fake.shape)  # 출력 결과는 (파일 수, feature_dim, 324*3) 형태가 됩니다.
-    elif args.feature == 'mfcc':
-        features_real = extract_mfcc(args.real, args.feature_dim, evs_folder=args.real if args.feature_mix else None, evs_indices=args.evs_feature_idx)
-        print(features_real.shape)  # 출력 결과는 (파일 수, feature_dim, 324*3) 형태가 됩니다.
+    features_real_mfcc = extract_mfcc(args.real, args.feature_dim, mfcc_indices)
+    features_fake_mfcc = extract_mfcc(args.fake, args.feature_dim, mfcc_indices)
+    features_real_evs = load_features(args.real, args.feature_dim, evs_indices)
+    features_fake_evs = load_features(args.fake, args.feature_dim, evs_indices)
 
-        features_fake = extract_mfcc(args.fake, args.feature_dim, evs_folder=args.fake if args.feature_mix else None, evs_indices=args.evs_feature_idx)
-        print(features_fake.shape)  # 출력 결과는 (파일 수, feature_dim, 324*3) 형태가 됩니다.
+    # 디버깅용: features_real_mfcc와 features_real_evs의 모양 출력
+    print("DEBUG: features_real_mfcc shape:", features_real_mfcc.shape)
+    print("DEBUG: features_real_evs shape:", features_real_evs.shape)
+
+    print(f"MFCC Real features shape: {features_real_mfcc.shape}")
+    print(f"MFCC Fake features shape: {features_fake_mfcc.shape}")
+    print(f"EVS Real features shape: {features_real_evs.shape}")
+    print(f"EVS Fake features shape: {features_fake_evs.shape}")

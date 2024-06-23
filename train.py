@@ -4,13 +4,20 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
 import argparse
 import matplotlib.pyplot as plt
-import importlib
 import numpy as np
 from sklearn.metrics import f1_score, roc_auc_score, roc_curve
 from scipy.optimize import brentq
 from scipy.interpolate import interp1d
 
 from Dataset import AudioFeaturesDataset
+
+def parse_feature_indices(index_str, max_dim):
+    if index_str == 'all':
+        return list(range(max_dim))
+    elif index_str == 'none':
+        return []
+    else:
+        return list(map(int, index_str.split()))
 
 def train_and_validate(model, device, train_loader, val_loader, optimizer, criterion, epochs, save_path):
     best_val_loss = float('inf')
@@ -23,7 +30,6 @@ def train_and_validate(model, device, train_loader, val_loader, optimizer, crite
     val_aucs = []
 
     for epoch in range(epochs):
-        # Training phase
         model.train()
         total_loss = 0
         correct_predictions = 0
@@ -38,7 +44,6 @@ def train_and_validate(model, device, train_loader, val_loader, optimizer, crite
             optimizer.step()
             total_loss += loss.item()
 
-            # Accuracy calculation
             predicted = torch.sigmoid(outputs).squeeze(1).round()
             correct_predictions += (predicted == labels).sum().item()
             total_samples += labels.size(0)
@@ -49,7 +54,6 @@ def train_and_validate(model, device, train_loader, val_loader, optimizer, crite
         train_accuracies.append(train_accuracy)
         print(f'Epoch [{epoch+1}/{epochs}], Train Loss: {avg_train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}')
 
-        # Validation phase
         model.eval()
         total_val_loss = 0
         correct_val_predictions = 0
@@ -64,7 +68,6 @@ def train_and_validate(model, device, train_loader, val_loader, optimizer, crite
                 loss = criterion(outputs.squeeze(1), labels.float())
                 total_val_loss += loss.item()
 
-                # Accuracy calculation
                 predicted = torch.sigmoid(outputs).squeeze(1).round()
                 correct_val_predictions += (predicted == labels).sum().item()
                 total_val_samples += labels.size(0)
@@ -76,20 +79,17 @@ def train_and_validate(model, device, train_loader, val_loader, optimizer, crite
         val_losses.append(avg_val_loss)
         val_accuracies.append(val_accuracy)
 
-        # Calculate EER
-        if len(set(all_labels)) > 1:  # Ensure both classes are present
+        if len(set(all_labels)) > 1:
             fpr, tpr, thresholds = roc_curve(all_labels, all_outputs)
             eer = brentq(lambda x: 1. - x - interp1d(fpr, tpr)(x), 0., 1.)
         else:
             eer = 0.0
         val_eers.append(eer)
 
-        # Calculate F1-score
         val_f1 = f1_score(all_labels, (np.array(all_outputs) > 0.5).astype(int))
         val_f1s.append(val_f1)
 
-        # Calculate AUC
-        if len(set(all_labels)) > 1:  # Ensure both classes are present
+        if len(set(all_labels)) > 1:
             val_auc = roc_auc_score(all_labels, all_outputs)
         else:
             val_auc = 0.0
@@ -97,13 +97,11 @@ def train_and_validate(model, device, train_loader, val_loader, optimizer, crite
 
         print(f'Epoch [{epoch+1}/{epochs}], Validation Loss: {avg_val_loss:.4f}, Validation Accuracy: {val_accuracy:.4f}, EER: {eer:.4f}, F1: {val_f1:.4f}, AUC: {val_auc:.4f}')
 
-        # Save the best model
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
             torch.save(model.state_dict(), save_path)
             print(f'Model saved to {save_path} with Validation Loss: {best_val_loss:.4f}')
 
-    # Plotting the losses, accuracies, and EER
     plt.figure(figsize=(20, 5))
 
     plt.subplot(1, 4, 1)
@@ -125,7 +123,7 @@ def train_and_validate(model, device, train_loader, val_loader, optimizer, crite
     plt.subplot(1, 4, 3)
     plt.plot(val_eers, label='Validation EER')
     plt.xlabel('Epochs')
-    plt.ylabel('EER')
+    plt.ylabel='EER'
     plt.title('EER')
     plt.legend()
 
@@ -133,7 +131,7 @@ def train_and_validate(model, device, train_loader, val_loader, optimizer, crite
     plt.plot(val_f1s, label='Validation F1')
     plt.plot(val_aucs, label='Validation AUC')
     plt.xlabel('Epochs')
-    plt.ylabel('Score')
+    plt.ylabel='Score'
     plt.title('F1 and AUC')
     plt.legend()
 
@@ -143,22 +141,21 @@ def train_and_validate(model, device, train_loader, val_loader, optimizer, crite
 def main(args):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    # feature_dim 계산
-    if args.feature == 'mfcc' and args.feature_mix:
-        evs_indices = list(map(int, args.evs_feature_idx.split()))
-        feature_dim = args.feature_dim + len(evs_indices)
-    else:
-        feature_dim = args.feature_dim
+    mfcc_indices = parse_feature_indices(args.mfcc_feature_idx, args.feature_dim)
+    evs_indices = parse_feature_indices(args.evs_feature_idx, args.feature_dim)
 
-    args.feature_dim = feature_dim
+    total_feature_dim = len(mfcc_indices) + len(evs_indices)
+
+    if args.model == 'cnn' and total_feature_dim < 8:
+        raise ValueError("For CNN model, total_feature_dim must be at least 8. Please adjust your feature indices.")
 
     dataset = AudioFeaturesDataset(
         args.real, args.fake, 
-        feature=args.feature, 
-        feature_dim=args.feature_dim, 
+        original_feature_dim=args.feature_dim,  # 원래의 feature_dim 전달
+        selected_feature_dim=total_feature_dim,  # 선택된 feature_dim 전달
         model_type=args.model,
-        feature_mix=args.feature_mix, 
-        evs_feature_idx=args.evs_feature_idx
+        mfcc_indices=mfcc_indices, 
+        evs_indices=evs_indices
     )
     
     train_size = int(0.6 * len(dataset))
@@ -172,10 +169,10 @@ def main(args):
     if args.model == 'lstm' or args.model == 'cnn':
         if args.model == 'lstm':
             from lstm import SimpleLSTM
-            model = SimpleLSTM(feat_dim=args.feature_dim, time_dim=972, mid_dim=30, out_dim=1).to(device)
+            model = SimpleLSTM(feat_dim=total_feature_dim, time_dim=972, mid_dim=30, out_dim=1).to(device)
         elif args.model == 'cnn':
             from cnn import SimpleCNN
-            model = SimpleCNN(feat_dim=args.feature_dim, time_dim=972, out_dim=1).to(device)
+            model = SimpleCNN(feat_dim=total_feature_dim, time_dim=972, out_dim=1).to(device)
     elif args.model == 'specrnet':
         from SpecRNet import SpecRNet
         model_args = {
@@ -196,7 +193,6 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Train a model.")
-    parser.add_argument('--feature', type=str, choices=['mfcc', 'evs'], required=True, help='Feature type to use.')
     parser.add_argument('--feature_dim', type=int, required=True, help='Number of features to use.')
     parser.add_argument('--real', type=str, required=True, help='Directory containing real audio features.')
     parser.add_argument('--fake', type=str, required=True, help='Directory containing fake audio features.')
@@ -205,7 +201,7 @@ if __name__ == '__main__':
     parser.add_argument('--save_path', type=str, default='model_weights.pt')
     parser.add_argument('--model', type=str, choices=['lstm', 'specrnet', 'cnn'], required=True, help='Model type to use.')
     parser.add_argument('--learning_rate', type=float, default=0.0000001, help='Learning rate for training the model.')
-    parser.add_argument('--feature_mix', type=bool, default=False, help='Whether to mix mfcc with evs features.')
-    parser.add_argument('--evs_feature_idx', type=str, help='Indices of evs features to add, space-separated.')
+    parser.add_argument('--mfcc_feature_idx', type=str, default='all', help='Indices of mfcc features to use, space-separated or "all".')
+    parser.add_argument('--evs_feature_idx', type=str, default='none', help='Indices of evs features to use, space-separated or "none".')
     args = parser.parse_args()
     main(args)
