@@ -66,11 +66,6 @@ class AudioFeaturesDataset(Dataset):
             
             self.data = np.concatenate((features_real, features_fake), axis=0)
             self.labels = np.concatenate((labels_real, labels_fake), axis=0)
-        elif os.path.exists(save_path):
-            print(f"Loading features and labels from {tensor_file} in current directory...")
-            data_dict = torch.load(save_path)
-            self.data = data_dict['data'].numpy()
-            self.labels = data_dict['labels'].numpy()
         else:
             print("Loading features and labels...")
             features_real_mfcc = extract_mfcc(base_folder_real, original_feature_dim, mfcc_indices)
