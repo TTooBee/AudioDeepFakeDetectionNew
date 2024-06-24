@@ -7,16 +7,30 @@ from preprocess import load_features, extract_mfcc, parse_feature_indices
 
 class AudioFeaturesDataset(Dataset):
     def __init__(self, base_folder_real, base_folder_fake, original_feature_dim, selected_feature_dim, model_type, train=True, test_split=0.2, mfcc_indices=[], evs_indices=[]):
+        all_features_mfcc_file = f'features_labels_mfcc_{original_feature_dim}.pt'
+        all_features_evs_file = f'features_labels_evs_{original_feature_dim}.pt'
         tensor_file = f'features_labels_mfcc_{len(mfcc_indices)}_evs_{len(evs_indices)}.pt'
         save_dir = 'features_and_labels'
         os.makedirs(save_dir, exist_ok=True)
         save_path = os.path.join(save_dir, tensor_file)
         
-        if os.path.exists(tensor_file):
+        if os.path.exists(all_features_mfcc_file) and os.path.exists(all_features_evs_file):
+            print(f"Loading features from {all_features_mfcc_file} and {all_features_evs_file}...")
+            mfcc_data = torch.load(all_features_mfcc_file)
+            evs_data = torch.load(all_features_evs_file)
+            features_real_mfcc = mfcc_data['data'].numpy()
+            features_fake_mfcc = mfcc_data['data'].numpy()
+            features_real_evs = evs_data['data'].numpy()
+            features_fake_evs = evs_data['data'].numpy()
+        elif os.path.exists(save_path):
             print(f"Loading features and labels from {tensor_file} in current directory...")
-            data_dict = torch.load(tensor_file)
+            data_dict = torch.load(save_path)
             self.data = data_dict['data'].numpy()
             self.labels = data_dict['labels'].numpy()
+            self.model_type = model_type
+            self.selected_feature_dim = selected_feature_dim
+            self._prepare_indices(train, test_split)
+            return
         else:
             print("Loading features and labels...")
             features_real_mfcc = extract_mfcc(base_folder_real, original_feature_dim, mfcc_indices)
@@ -24,33 +38,42 @@ class AudioFeaturesDataset(Dataset):
             features_real_evs = load_features(base_folder_real, original_feature_dim, evs_indices)
             features_fake_evs = load_features(base_folder_fake, original_feature_dim, evs_indices)
 
-            # 디버깅용: features_real_mfcc와 features_real_evs의 모양 출력
-            print("DEBUG: features_real_mfcc shape:", features_real_mfcc.shape)
-            print("DEBUG: features_real_evs shape:", features_real_evs.shape)
-            
-            features_real = np.concatenate((features_real_mfcc, features_real_evs), axis=1)
-            features_fake = np.concatenate((features_fake_mfcc, features_fake_evs), axis=1)
-            
-            labels_real = np.ones(len(features_real))
-            labels_fake = np.zeros(len(features_fake))
-            
-            self.data = np.concatenate((features_real, features_fake), axis=0)
-            self.labels = np.concatenate((labels_real, labels_fake), axis=0)
-            
-            torch.save({'data': torch.tensor(self.data), 'labels': torch.tensor(self.labels)}, save_path)
-            print(f"Features and labels saved to {save_path}")
+        # 디버깅용: features_real_mfcc와 features_real_evs의 모양 출력
+        print("DEBUG: features_real_mfcc shape:", features_real_mfcc.shape)
+        print("DEBUG: features_real_evs shape:", features_real_evs.shape)
+
+        if len(mfcc_indices) > 0:
+            features_real_mfcc = features_real_mfcc[:, mfcc_indices, :]
+            features_fake_mfcc = features_fake_mfcc[:, mfcc_indices, :]
+        if len(evs_indices) > 0:
+            features_real_evs = features_real_evs[:, evs_indices, :]
+            features_fake_evs = features_fake_evs[:, evs_indices, :]
+        
+        features_real = np.concatenate((features_real_mfcc, features_real_evs), axis=1)
+        features_fake = np.concatenate((features_fake_mfcc, features_fake_evs), axis=1)
+        
+        labels_real = np.ones(len(features_real))
+        labels_fake = np.zeros(len(features_fake))
+        
+        self.data = np.concatenate((features_real, features_fake), axis=0)
+        self.labels = np.concatenate((labels_real, labels_fake), axis=0)
+        
+        torch.save({'data': torch.tensor(self.data), 'labels': torch.tensor(self.labels)}, save_path)
+        print(f"Features and labels saved to {save_path}")
         
         print(f"Loaded {len(self.data)} features.")
-
-        indices = np.arange(len(self.data))
-        np.random.shuffle(indices)
-        split = int(len(indices) * (1 - test_split))
-        self.indices = indices[:split] if train else indices[split:]
+        self._prepare_indices(train, test_split)
 
         print(f"Dataset created with {len(self.indices)} samples.")
 
         self.model_type = model_type
         self.selected_feature_dim = selected_feature_dim
+
+    def _prepare_indices(self, train, test_split):
+        indices = np.arange(len(self.data))
+        np.random.shuffle(indices)
+        split = int(len(indices) * (1 - test_split))
+        self.indices = indices[:split] if train else indices[split:]
 
     def __len__(self):
         return len(self.indices)
