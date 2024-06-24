@@ -131,9 +131,6 @@ class AudioFeaturesDataset(Dataset):
         if self.model_type == 'specrnet' or self.model_type == 'cnn':
             feature = feature.view(1, self.selected_feature_dim, -1)
 
-        # 디버깅용: 추출된 feature의 모양 출력
-        print(f"DEBUG: Feature shape at idx {idx}: {feature.shape}")
-
         return feature, torch.tensor(self.labels[real_idx], dtype=torch.long)
 
 if __name__ == "__main__":

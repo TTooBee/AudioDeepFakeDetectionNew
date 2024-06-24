@@ -1,0 +1,20 @@
+Training Arguments:
+--feature_dim : 12
+--real : real
+--fake : fake
+--batch_size : 2
+--epochs : 4
+--save_path : None
+--model : lstm
+--learning_rate : 1e-07
+--mfcc_feature_idx : 0
+--evs_feature_idx : 0
+
+Training Results:
+Train Losses: [0.6911686062812805, 0.6927705332636833, 0.6910203546285629, 0.691665768623352]
+Validation Losses: [0.6958352526028951, 0.6958505908648173, 0.6958640019098917, 0.695877214272817]
+Train Accuracies: [0.6, 0.6, 0.6, 0.6]
+Validation Accuracies: [0.4, 0.4, 0.4, 0.4]
+Validation EERs: [0.49999999999944156, 0.49999999999944156, 0.49999999999944156, 0.49999999999944156]
+Validation F1 Scores: [0.0, 0.0, 0.0, 0.0]
+Validation AUCs: [0.6666666666666666, 0.6666666666666666, 0.6666666666666666, 0.6666666666666666]

@@ -1,0 +1,21 @@
+Training Arguments:
+--feature_dim : 12
+--real : real
+--fake : fake
+--batch_size : 2
+--epochs : 4
+--save_path : 
+--model : lstm
+--learning_rate : 1e-07
+--mfcc_feature_idx : 0
+--evs_feature_idx : 0
+
+Training Results:
+Epoch [1/4], Train Loss: 0.6955, Train Accuracy: 0.4286
+Epoch [1/4], Validation Loss: 0.6977, Validation Accuracy: 0.5000, EER: 1.0000, F1: 0.0000, AUC: 0.0000
+Epoch [2/4], Train Loss: 0.6956, Train Accuracy: 0.5714
+Epoch [2/4], Validation Loss: 0.6977, Validation Accuracy: 0.0000, EER: 1.0000, F1: 0.0000, AUC: 0.0000
+Epoch [3/4], Train Loss: 0.6935, Train Accuracy: 0.4286
+Epoch [3/4], Validation Loss: 0.6977, Validation Accuracy: 0.0000, EER: 1.0000, F1: 0.0000, AUC: 0.0000
+Epoch [4/4], Train Loss: 0.6933, Train Accuracy: 0.5714
+Epoch [4/4], Validation Loss: 0.6977, Validation Accuracy: 0.0000, EER: 1.0000, F1: 0.0000, AUC: 0.0000
