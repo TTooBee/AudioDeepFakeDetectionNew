@@ -21,10 +21,17 @@ class AudioFeaturesDataset(Dataset):
             print(f"Loading features from {all_features_mfcc_file} and {all_features_evs_file}...")
             mfcc_data = torch.load(all_features_mfcc_file)
             evs_data = torch.load(all_features_evs_file)
-            features_real_mfcc = mfcc_data['data'].numpy()
-            features_fake_mfcc = mfcc_data['data'].numpy()
-            features_real_evs = evs_data['data'].numpy()
-            features_fake_evs = evs_data['data'].numpy()
+            features_mfcc = mfcc_data['data'].numpy()
+            labels_mfcc = mfcc_data['labels'].numpy()
+            features_evs = evs_data['data'].numpy()
+            labels_evs = evs_data['labels'].numpy()
+
+            # 데이터셋을 real과 fake로 분리
+            mid_point = len(features_mfcc) // 2
+            features_real_mfcc = features_mfcc[:mid_point]
+            features_fake_mfcc = features_mfcc[mid_point:]
+            features_real_evs = features_evs[:mid_point]
+            features_fake_evs = features_evs[mid_point:]
 
             # 디버깅용: 로드된 MFCC 및 EVS 데이터의 모양 출력
             print(f"DEBUG: Loaded features_real_mfcc shape(before parse): {features_real_mfcc.shape}")
@@ -123,6 +130,9 @@ class AudioFeaturesDataset(Dataset):
         
         if self.model_type == 'specrnet' or self.model_type == 'cnn':
             feature = feature.view(1, self.selected_feature_dim, -1)
+
+        # 디버깅용: 추출된 feature의 모양 출력
+        print(f"DEBUG: Feature shape at idx {idx}: {feature.shape}")
 
         return feature, torch.tensor(self.labels[real_idx], dtype=torch.long)
 
