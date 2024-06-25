@@ -21,42 +21,21 @@ class AudioFeaturesDataset(Dataset):
             print(f"Loading features from {all_features_mfcc_file} and {all_features_evs_file}...")
             mfcc_data = torch.load(all_features_mfcc_file)
             evs_data = torch.load(all_features_evs_file)
-            features_mfcc = mfcc_data['data'].numpy()
-            labels_mfcc = mfcc_data['labels'].numpy()
-            features_evs = evs_data['data'].numpy()
-            labels_evs = evs_data['labels'].numpy()
-
-            # 데이터셋을 real과 fake로 분리
-            mid_point = len(features_mfcc) // 2
-            features_real_mfcc = features_mfcc[:mid_point]
-            features_fake_mfcc = features_mfcc[mid_point:]
-            features_real_evs = features_evs[:mid_point]
-            features_fake_evs = features_evs[mid_point:]
+            features_real_mfcc = mfcc_data['data'].numpy()
+            features_fake_mfcc = mfcc_data['data'].numpy()
+            features_real_evs = evs_data['data'].numpy()
+            features_fake_evs = evs_data['data'].numpy()
 
             # 디버깅용: 로드된 MFCC 및 EVS 데이터의 모양 출력
-            print(f"DEBUG: Loaded features_real_mfcc shape(before parse): {features_real_mfcc.shape}")
-            print(f"DEBUG: Loaded features_fake_mfcc shape(before parse): {features_fake_mfcc.shape}")
-            print(f"DEBUG: Loaded features_real_evs shape(before parse): {features_real_evs.shape}")
-            print(f"DEBUG: Loaded features_fake_evs shape(before parse): {features_fake_evs.shape}")
-
-            if mfcc_indices_str != 'none':
-                features_real_mfcc = features_real_mfcc[:, mfcc_indices, :]
-                features_fake_mfcc = features_fake_mfcc[:, mfcc_indices, :]
-            else:
-                features_real_mfcc = np.zeros((features_real_mfcc.shape[0], 0, features_real_mfcc.shape[2]))
-                features_fake_mfcc = np.zeros((features_fake_mfcc.shape[0], 0, features_fake_mfcc.shape[2]))
+            print(f"DEBUG: Loaded features_real_mfcc shape(before feature idx selected): {features_real_mfcc.shape}")
+            print(f"DEBUG: Loaded features_fake_mfcc shape(before feature idx selected): {features_fake_mfcc.shape}")
+            print(f"DEBUG: Loaded features_real_evs shape(before feature idx selected): {features_real_evs.shape}")
+            print(f"DEBUG: Loaded features_fake_evs shape(before feature idx selected): {features_fake_evs.shape}")
                 
-            if evs_indices_str != 'none':
-                features_real_evs = features_real_evs[:, evs_indices, :]
-                features_fake_evs = features_fake_evs[:, evs_indices, :]
-            else:
-                features_real_evs = np.zeros((features_real_evs.shape[0], 0, features_real_evs.shape[2]))
-                features_fake_evs = np.zeros((features_fake_evs.shape[0], 0, features_fake_evs.shape[2]))
-                
-            print(f"DEBUG: Loaded features_real_mfcc shape(after parse): {features_real_mfcc.shape}")
-            print(f"DEBUG: Loaded features_fake_mfcc shape(after parse): {features_fake_mfcc.shape}")
-            print(f"DEBUG: Loaded features_real_evs shape(after parse): {features_real_evs.shape}")
-            print(f"DEBUG: Loaded features_fake_evs shape(after parse): {features_fake_evs.shape}")
+            print(f"DEBUG: Loaded features_real_mfcc shape(after feature idx selected): {features_real_mfcc.shape}")
+            print(f"DEBUG: Loaded features_fake_mfcc shape(after feature idx selected): {features_fake_mfcc.shape}")
+            print(f"DEBUG: Loaded features_real_evs shape(after feature idx selected): {features_real_evs.shape}")
+            print(f"DEBUG: Loaded features_fake_evs shape(after feature idx selected): {features_fake_evs.shape}")
             
             features_real = np.concatenate((features_real_mfcc, features_real_evs), axis=1)
             features_fake = np.concatenate((features_fake_mfcc, features_fake_evs), axis=1)
@@ -74,22 +53,13 @@ class AudioFeaturesDataset(Dataset):
             features_fake_evs = load_features(base_folder_fake, original_feature_dim, evs_indices)
 
             # 디버깅용: features_real_mfcc와 features_real_evs의 모양 출력
-            print("DEBUG: features_real_mfcc shape(before parse):", features_real_mfcc.shape)
-            print("DEBUG: features_real_evs shape(before parse):", features_real_evs.shape)
-
-            if mfcc_indices_str != 'none':
-                features_real_mfcc = features_real_mfcc[:, mfcc_indices, :]
-                features_fake_mfcc = features_fake_mfcc[:, mfcc_indices, :]
-            else:
-                features_real_mfcc = np.zeros((features_real_mfcc.shape[0], 0, features_real_mfcc.shape[2]))
-                features_fake_mfcc = np.zeros((features_fake_mfcc.shape[0], 0, features_fake_mfcc.shape[2]))
-
-            if evs_indices_str != 'none':
-                features_real_evs = features_real_evs[:, evs_indices, :]
-                features_fake_evs = features_fake_evs[:, evs_indices, :]
-            else:
-                features_real_evs = np.zeros((features_real_evs.shape[0], 0, features_real_evs.shape[2]))
-                features_fake_evs = np.zeros((features_fake_evs.shape[0], 0, features_fake_evs.shape[2]))
+            print("DEBUG: features_real_mfcc shape(before feature idx selected):", features_real_mfcc.shape)
+            print("DEBUG: features_real_evs shape(before feature idx selected):", features_real_evs.shape)
+            
+            print(f"DEBUG: features_real_mfcc shape(after feature idx selected): {features_real_mfcc.shape}")
+            print(f"DEBUG: features_fake_mfcc shape(after feature idx selected): {features_fake_mfcc.shape}")
+            print(f"DEBUG: features_real_evs shape(after feature idx selected): {features_real_evs.shape}")
+            print(f"DEBUG: features_fake_evs shape(after feature idx selected): {features_fake_evs.shape}")
             
             features_real = np.concatenate((features_real_mfcc, features_real_evs), axis=1)
             features_fake = np.concatenate((features_fake_mfcc, features_fake_evs), axis=1)
