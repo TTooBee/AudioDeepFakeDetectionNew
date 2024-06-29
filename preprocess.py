@@ -62,7 +62,7 @@ def extract_mfcc(base_folder, original_feature_dim, selected_indices, sample_rat
 
     files = [f for f in os.listdir(wav_folder) if f.endswith(('.flac', '.wav'))]
     
-    n_mels = original_feature_dim * 3
+    n_mels = 50
     
     mfcc_transform = transforms.MFCC(
         sample_rate=sample_rate,

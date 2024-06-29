@@ -12,7 +12,8 @@ python train.py --feature_dim 12 --real real --fake fake --batch_size 16 --epoch
     - 'all'의 경우 전부 다
     - 'none'의 경우 하나도 안뽑음
 
-# 주의사항
+# 주의사항(수시로 업데이트됨)
+- Dataset.py에서, feature_dim이 클 경우 pt파일로 저장하는 부분 주석처리 해야함(2024/06/30)
 - model을 cnn으로 설정했을 경우, 'mfcc_feature_idx의 크기 + evs_feature_idx의 크기'가 8 이상이어야 함
 - 예를 들어 '--model cnn --mfcc_feature_idx '0 1 3' --evs_feature_idx '2 4'' 로 설정하면 실행 안됨
 - lstm은 상관 없음
