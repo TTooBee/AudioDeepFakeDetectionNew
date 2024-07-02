@@ -181,8 +181,10 @@ def main(args):
 
     mfcc_indices = parse_feature_indices(args.mfcc_feature_idx, args.feature_dim)
     evs_indices = parse_feature_indices(args.evs_feature_idx, args.feature_dim)
+    lsf_indices = parse_feature_indices(args.lsf_feature_idx, args.feature_dim)
+    lsp_indices = parse_feature_indices(args.lsp_feature_idx, args.feature_dim)
 
-    total_feature_dim = len(mfcc_indices) + len(evs_indices)
+    total_feature_dim = len(mfcc_indices) + len(evs_indices) + len(lsf_indices) + len(lsp_indices)
 
     if args.model == 'cnn' and total_feature_dim < 8:
         raise ValueError("For CNN model, total_feature_dim must be at least 8. Please adjust your feature indices.")
@@ -193,7 +195,9 @@ def main(args):
         selected_feature_dim=total_feature_dim,  # 선택된 feature_dim 전달
         model_type=args.model,
         mfcc_indices_str=args.mfcc_feature_idx, 
-        evs_indices_str=args.evs_feature_idx
+        evs_indices_str=args.evs_feature_idx,
+        lsf_indices_str=args.lsf_feature_idx,
+        lsp_indices_str=args.lsp_feature_idx
     )
     
     train_size = int(0.6 * len(dataset))
@@ -241,5 +245,7 @@ if __name__ == '__main__':
     parser.add_argument('--learning_rate', type=float, default=0.0000001, help='Learning rate for training the model.')
     parser.add_argument('--mfcc_feature_idx', type=str, default='all', help='Indices of mfcc features to use, space-separated or "all".')
     parser.add_argument('--evs_feature_idx', type=str, default='none', help='Indices of evs features to use, space-separated or "none".')
+    parser.add_argument('--lsf_feature_idx', type=str, default='none', help='Indices of lsf features to use, space-separated or "none".')
+    parser.add_argument('--lsp_feature_idx', type=str, default='none', help='Indices of lsp features to use, space-separated or "none".')
     args = parser.parse_args()
     main(args)
