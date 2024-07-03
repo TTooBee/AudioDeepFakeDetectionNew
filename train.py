@@ -57,7 +57,7 @@ def save_training_plot(train_losses, val_losses, train_accuracies, val_accuracie
     plt.subplot(1, 4, 3)
     plt.plot(val_eers, label='Validation EER')
     plt.xlabel('Epochs')
-    plt.ylabel='EER'
+    plt.ylabel('EER')
     plt.title('EER')
     plt.legend()
 
@@ -90,6 +90,9 @@ def train_and_validate(model, device, train_loader, val_loader, optimizer, crite
 
     if not save_path:
         save_path = os.path.join(result_folder, 'model_weights.pt')
+
+    early_stopping_patience = 10  # 조기 종료를 위한 patience
+    no_improvement_count = 0  # 개선되지 않은 epoch 수
 
     for epoch in range(epochs):
         model.train()
@@ -163,6 +166,14 @@ def train_and_validate(model, device, train_loader, val_loader, optimizer, crite
             best_val_loss = avg_val_loss
             torch.save(model.state_dict(), save_path)
             print(f"Model saved to {save_path} with Validation Loss: {best_val_loss:.4f}")
+            no_improvement_count = 0  # 개선되었으므로 초기화
+        else:
+            no_improvement_count += 1
+
+        # 조기 종료 조건 확인
+        if no_improvement_count >= early_stopping_patience:
+            print(f"No improvement for {early_stopping_patience} consecutive epochs. Early stopping.")
+            break
 
     save_training_results(args, [
         f"Train Losses: {train_losses}",
@@ -242,7 +253,7 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=20)
     parser.add_argument('--save_path', type=str, help='Path to save the model weights. Default is inside training_result folder with timestamp.')
     parser.add_argument('--model', type=str, choices=['lstm', 'specrnet', 'cnn'], required=True, help='Model type to use.')
-    parser.add_argument('--learning_rate', type=float, default=0.0000001, help='Learning rate for training the model.')
+    parser.add_argument('--learning_rate', type=float, default=0.000001, help='Learning rate for training the model.')
     parser.add_argument('--mfcc_feature_idx', type=str, default='all', help='Indices of mfcc features to use, space-separated or "all".')
     parser.add_argument('--evs_feature_idx', type=str, default='none', help='Indices of evs features to use, space-separated or "none".')
     parser.add_argument('--lsf_feature_idx', type=str, default='none', help='Indices of lsf features to use, space-separated or "none".')

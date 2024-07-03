@@ -17,20 +17,22 @@ class AudioFeaturesDataset(Dataset):
         # Define file names for saving/loading all features
         save_dir = 'features_and_labels'
         os.makedirs(save_dir, exist_ok=True)
-        all_features_mfcc_file = os.path.join(save_dir, 'features_labels_mfcc.pt')
+        # all_features_mfcc_file = os.path.join(save_dir, 'features_labels_mfcc.pt') mfcc는 그냥 바로 음원에서 뽑아서 쓰자
         all_features_evs_file = os.path.join(save_dir, f'features_labels_evs_{original_feature_dim}.pt')
         all_features_lsp_file = os.path.join(save_dir, f'features_labels_lsp_{original_feature_dim}.pt')
         all_features_lsf_file = os.path.join(save_dir, f'features_labels_lsf_{original_feature_dim}.pt')
 
         # Check if the complete features files exist
-        if os.path.exists(all_features_mfcc_file) and os.path.exists(all_features_evs_file) and os.path.exists(all_features_lsp_file) and os.path.exists(all_features_lsf_file):
-            print(f"Loading features from {all_features_mfcc_file}, {all_features_evs_file}, {all_features_lsp_file}, and {all_features_lsf_file}...")
-            mfcc_data = torch.load(all_features_mfcc_file)
+        if os.path.exists(all_features_evs_file) and os.path.exists(all_features_lsp_file) and os.path.exists(all_features_lsf_file):
+            print(f"Loading features from {all_features_evs_file}, {all_features_lsp_file}, and {all_features_lsf_file}/ mfcc extracting...")
+            # mfcc_data = torch.load(all_features_mfcc_file)
             evs_data = torch.load(all_features_evs_file)
             lsp_data = torch.load(all_features_lsp_file)
             lsf_data = torch.load(all_features_lsf_file)
-            features_real_mfcc = mfcc_data['real']
-            features_fake_mfcc = mfcc_data['fake']
+            # features_real_mfcc = mfcc_data['real']
+            # features_fake_mfcc = mfcc_data['fake']
+            features_real_mfcc = extract_mfcc(base_folder_real, n_mels, list(range(n_mels)))
+            features_fake_mfcc = extract_mfcc(base_folder_fake, n_mels, list(range(n_mels)))
             features_real_evs = evs_data['real']
             features_fake_evs = evs_data['fake']
             features_real_lsp = lsp_data['real']
@@ -79,15 +81,16 @@ class AudioFeaturesDataset(Dataset):
         else:
             # Extract features and save them
             print("Loading and extracting features...")
-            features_real_mfcc = extract_mfcc(base_folder_real, original_feature_dim, list(range(original_feature_dim)))
-            features_fake_mfcc = extract_mfcc(base_folder_fake, original_feature_dim, list(range(original_feature_dim)))
+            features_real_mfcc = extract_mfcc(base_folder_real, n_mels, list(range(n_mels)))
+            features_fake_mfcc = extract_mfcc(base_folder_fake, n_mels, list(range(n_mels)))
             features_real_evs = load_features(base_folder_real, original_feature_dim, list(range(original_feature_dim)))
             features_fake_evs = load_features(base_folder_fake, original_feature_dim, list(range(original_feature_dim)))
-            features_real_lsp, features_real_lsf = extract_lsf_lsp(base_folder_real, original_feature_dim, list(range(original_feature_dim)), list(range(original_feature_dim)))
-            features_fake_lsp, features_fake_lsf = extract_lsf_lsp(base_folder_fake, original_feature_dim, list(range(original_feature_dim)), list(range(original_feature_dim)))
+            lsf_lsp_feature_dim = 20
+            features_real_lsp, features_real_lsf = extract_lsf_lsp(base_folder_real, lsf_lsp_feature_dim, list(range(lsf_lsp_feature_dim)), list(range(lsf_lsp_feature_dim)))
+            features_fake_lsp, features_fake_lsf = extract_lsf_lsp(base_folder_fake, lsf_lsp_feature_dim, list(range(lsf_lsp_feature_dim)), list(range(lsf_lsp_feature_dim)))
 
             # Save features
-            torch.save({'real': features_real_mfcc, 'fake': features_fake_mfcc}, all_features_mfcc_file)
+            # torch.save({'real': features_real_mfcc, 'fake': features_fake_mfcc}, all_features_mfcc_file) 우선 mfcc는 저장하지 않음
             torch.save({'real': features_real_evs, 'fake': features_fake_evs}, all_features_evs_file)
             torch.save({'real': features_real_lsp, 'fake': features_fake_lsp}, all_features_lsp_file)
             torch.save({'real': features_real_lsf, 'fake': features_fake_lsf}, all_features_lsf_file)

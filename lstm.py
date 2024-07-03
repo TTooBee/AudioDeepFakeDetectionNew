@@ -11,6 +11,7 @@ class SimpleLSTM(nn.Module):
         time_dim: int,
         mid_dim: int,
         out_dim: int,
+        dropout_prob: float = 0.5,  # Dropout 확률 추가
         **kwargs,
     ):
         super(SimpleLSTM, self).__init__()
@@ -21,10 +22,11 @@ class SimpleLSTM(nn.Module):
             num_layers=2,
             bidirectional=True,
             batch_first=True,
-            dropout=0.01,
+            dropout=dropout_prob,
         )
         self.conv = nn.Conv1d(in_channels=mid_dim * 2, out_channels=10, kernel_size=1)
         self.fc = nn.Linear(in_features=time_dim * 10, out_features=out_dim)
+        self.dropout = nn.Dropout(dropout_prob)  # Dropout 레이어 추가
 
     def forward(self, x: torch.Tensor):
         """
@@ -43,6 +45,7 @@ class SimpleLSTM(nn.Module):
 
         feat = self.conv(feat)  # (B, C, T)
         feat = F.relu(feat)  # (B, C, T)
+        feat = self.dropout(feat)  # Dropout 적용
         feat = feat.reshape(B, -1)  # (B, C*T)
         out = self.fc(feat)  # (B, out_dim)
 
@@ -56,6 +59,7 @@ class WaveLSTM(nn.Module):
         input_len: int,
         hidden_dim: int,
         out_dim: int,
+        dropout_prob: float = 0.5,  # Dropout 확률 추가
         **kwargs,
     ):
         super(WaveLSTM, self).__init__()
@@ -69,12 +73,13 @@ class WaveLSTM(nn.Module):
             num_layers=2,
             bidirectional=True,
             batch_first=True,
-            dropout=0.01,
+            dropout=dropout_prob,
         )
         self.conv = nn.Conv1d(
             in_channels=hidden_dim * 2, out_channels=10, kernel_size=1
         )
         self.fc = nn.Linear(in_features=self.num_frames * 10, out_features=out_dim)
+        self.dropout = nn.Dropout(dropout_prob)  # Dropout 레이어 추가
 
     def forward(self, x: torch.Tensor):
         """
@@ -92,6 +97,7 @@ class WaveLSTM(nn.Module):
 
         feat = self.conv(feat)  # (B, C, T)
         feat = F.relu(feat)  # (B, C, T)
+        feat = self.dropout(feat)  # Dropout 적용
         feat = feat.reshape(B, -1)  # (B, C*T)
         out = self.fc(feat)  # (B, out_dim)
 
@@ -99,13 +105,13 @@ class WaveLSTM(nn.Module):
 
 
 if __name__ == "__main__":
-    model = SimpleLSTM(feat_dim=40, time_dim=972, mid_dim=30, out_dim=1)
+    model = SimpleLSTM(feat_dim=40, time_dim=972, mid_dim=30, out_dim=1, dropout_prob=0.5)
     x = torch.Tensor(np.random.rand(8, 40, 972))
     y = model(x)
     print(y.shape)
     print(y)
 
-    # model = WaveLSTM(num_frames=10, input_len=64600, hidden_dim=30, out_dim=1)
+    # model = WaveLSTM(num_frames=10, input_len=64600, hidden_dim=30, out_dim=1, dropout_prob=0.5)
     # x = torch.Tensor(np.random.rand(8, 64600))
     # y = model(x)
     # print(y.shape)

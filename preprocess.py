@@ -74,16 +74,25 @@ def load_features(base_folder, original_feature_dim, selected_indices):
     all_features = []
     feature_folder = os.path.join(base_folder, f'features_{original_feature_dim}')
     
+    use_fallback = False
     if not os.path.isdir(feature_folder):
-        print(f"DEBUG: Feature folder {feature_folder} does not exist")
-        return np.array(all_features)
+        print(f"DEBUG: Feature folder {feature_folder} does not exist, trying to load features_12")
+        feature_folder = os.path.join(base_folder, 'features_12')
+        if not os.path.isdir(feature_folder):
+            print(f"DEBUG: Alternative feature folder {feature_folder} also does not exist")
+            return np.array(all_features)
+        use_fallback = True
 
     files = [f for f in os.listdir(feature_folder) if f.endswith('.txt')]
     
     for file_name in tqdm(files, desc="Processing files", unit="file"):
         feature_path = os.path.join(feature_folder, file_name)
         try:
-            matrix = load_and_pad_matrix(feature_path, feature_dim=original_feature_dim)
+            matrix = load_and_pad_matrix(feature_path, feature_dim=original_feature_dim if not use_fallback else 12)
+            if use_fallback and original_feature_dim != 12:
+                # 제로패딩을 통해 12->original_feature_dim으로 변환
+                padding = np.zeros((original_feature_dim - 12, matrix.shape[1]))
+                matrix = np.vstack((matrix, padding))
         except Exception as e:
             print(f"DEBUG: Failed to load file {feature_path}: {e}")
             continue
